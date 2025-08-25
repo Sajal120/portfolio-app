@@ -19,6 +19,7 @@ import SupabaseConnectionTest from "./pages/SupabaseConnectionTest";
 import QuickTest from "./pages/QuickTest";
 import DataTest from "./pages/DataTest";
 import SimpleAdminDashboard from "./pages/SimpleAdminDashboard";
+import RouteDebug from "./pages/RouteDebug";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./components/AdminLogin";
@@ -51,6 +52,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/route-debug" element={<RouteDebug />} />
             <Route path="/test" element={<SupabaseTest />} />
             <Route path="/debug" element={<DebugAuth />} />
             <Route path="/direct-login" element={<DirectLogin />} />
