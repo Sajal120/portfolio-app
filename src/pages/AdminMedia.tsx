@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Image as ImageIcon, 
   FloppyDisk as Save, 
@@ -17,10 +17,21 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { supabase } from '../lib/supabase';
+import { 
+  uploadToBlob, 
+  deleteFromBlob, 
+  deleteMultipleFromBlob, 
+  listBlobFiles,
+  formatFileSize,
+  extractFilenameFromUrl,
+  validateFileType,
+  validateFileSize,
+  type BlobFile 
+} from '../lib/blobStorage';
 import toast from 'react-hot-toast';
 
-interface MediaFile {
+interface MediaFile extends BlobFile {
+  // Additional properties for compatibility
   name: string;
   id?: string;
   updated_at?: string;
@@ -38,21 +49,36 @@ const AdminMedia: React.FC = () => {
   const [filterType, setFilterType] = useState('all');
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [currentFolder, setCurrentFolder] = useState('');
+  
+  // File input ref for triggering upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFiles = async () => {
     try {
+      console.log('Loading files from blob storage...');
       setLoading(true);
-      const { data, error } = await supabase.storage
-        .from('images')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
+      const { data, error } = await listBlobFiles();
 
-      if (error) throw error;
+      console.log('listBlobFiles result:', { data, error });
+      if (error) {
+        console.error('listBlobFiles error:', error);
+        throw new Error(error);
+      }
 
-      setFiles(data || []);
+      // Transform blob files to match MediaFile interface
+      const transformedFiles: MediaFile[] = (data || []).map(blobFile => ({
+        ...blobFile,
+        name: blobFile.filename,
+        created_at: blobFile.uploadedAt.toISOString(),
+        updated_at: blobFile.uploadedAt.toISOString(),
+        metadata: {
+          size: blobFile.size,
+          mimetype: getMimeTypeFromUrl(blobFile.url)
+        }
+      }));
+
+      console.log('Transformed files:', transformedFiles);
+      setFiles(transformedFiles);
     } catch (error) {
       console.error('Error loading files:', error);
       toast.error('Failed to load media files');
@@ -61,9 +87,29 @@ const AdminMedia: React.FC = () => {
     }
   };
 
+  // Helper function to determine mimetype from URL
+  const getMimeTypeFromUrl = (url: string): string => {
+    const extension = url.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+      mp4: 'video/mp4',
+      webm: 'video/webm',
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      txt: 'text/plain'
+    };
+    return mimeTypes[extension || ''] || 'application/octet-stream';
+  };
+
   useEffect(() => {
     loadFiles();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const filterFiles = () => {
@@ -104,38 +150,72 @@ const AdminMedia: React.FC = () => {
     const uploadFiles = event.target.files;
     if (!uploadFiles || uploadFiles.length === 0) return;
 
+    console.log('Starting file upload, files:', uploadFiles.length);
     setUploading(true);
     const uploadPromises = [];
+    let validFiles = 0;
 
     for (let i = 0; i < uploadFiles.length; i++) {
       const file = uploadFiles[i];
+      console.log('Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
       
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
+      // Validate file type
+      if (!validateFileType(file, ['image/', 'video/', 'application/pdf', 'text/', 'application/msword'])) {
+        console.error('Invalid file type:', file.type);
+        toast.error(`Invalid file type for ${file.name}`);
+        continue;
+      }
 
-      uploadPromises.push(
-        supabase.storage
-          .from('images')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false
-          })
-      );
+      // Validate file size (max 10MB)
+      if (!validateFileSize(file, 10)) {
+        console.error('File too large:', file.size);
+        toast.error(`File ${file.name} is too large (max 10MB)`);
+        continue;
+      }
+
+      // Determine folder based on file type
+      let folder = 'misc';
+      if (file.type.startsWith('image/')) folder = 'images';
+      else if (file.type.startsWith('video/')) folder = 'videos';
+      else if (file.type.includes('pdf') || file.type.includes('document')) folder = 'documents';
+
+      console.log('Uploading file to folder:', folder);
+      validFiles++;
+      uploadPromises.push(uploadToBlob(file, folder));
+    }
+
+    if (validFiles === 0) {
+      console.log('No valid files to upload');
+      setUploading(false);
+      return;
     }
 
     try {
+      console.log('Executing upload promises for', validFiles, 'files');
       const results = await Promise.all(uploadPromises);
+      console.log('Upload results:', results);
+      
       const errors = results.filter(result => result.error);
+      const successful = results.filter(result => result.data);
       
       if (errors.length > 0) {
+        console.error('Upload errors:', errors);
         toast.error(`Failed to upload ${errors.length} file(s)`);
-      } else {
-        toast.success(`Successfully uploaded ${uploadFiles.length} file(s)`);
+        errors.forEach(result => {
+          if (result.error) {
+            console.error('Upload error:', result.error);
+          }
+        });
       }
       
-      loadFiles(); // Reload files list
+      if (successful.length > 0) {
+        console.log('Successful uploads:', successful.length);
+        toast.success(`Successfully uploaded ${successful.length} file(s)`);
+      }
+      
+      // Reload files list
+      console.log('Reloading files list...');
+      await loadFiles();
     } catch (error) {
       console.error('Error uploading files:', error);
       toast.error('Failed to upload files');
@@ -152,13 +232,21 @@ const AdminMedia: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.storage
-        .from('images')
-        .remove([fileName]);
+      // Find the file to get its URL
+      const fileToDelete = files.find(f => f.name === fileName);
+      if (!fileToDelete) {
+        toast.error('File not found');
+        return;
+      }
 
-      if (error) throw error;
+      const { success, error } = await deleteFromBlob(fileToDelete.url);
+
+      if (!success) {
+        throw new Error(error || 'Failed to delete file');
+      }
 
       setFiles(prev => prev.filter(file => file.name !== fileName));
+      setSelectedFiles(prev => prev.filter(f => f !== fileName));
       toast.success('File deleted successfully');
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -174,15 +262,28 @@ const AdminMedia: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.storage
-        .from('images')
-        .remove(selectedFiles);
+      // Get URLs for selected files
+      const filesToDelete = files.filter(f => selectedFiles.includes(f.name));
+      const urls = filesToDelete.map(f => f.url);
 
-      if (error) throw error;
+      const { success, error, failedUrls } = await deleteMultipleFromBlob(urls);
 
-      setFiles(prev => prev.filter(file => !selectedFiles.includes(file.name)));
+      if (!success) {
+        toast.error(error || `Failed to delete ${failedUrls.length} file(s)`);
+      } else {
+        toast.success(`Successfully deleted ${selectedFiles.length} file(s)`);
+      }
+
+      // Remove successfully deleted files from state
+      const failedFileNames = failedUrls.map(url => {
+        const file = files.find(f => f.url === url);
+        return file?.name;
+      }).filter(Boolean);
+
+      setFiles(prev => prev.filter(file => 
+        !selectedFiles.includes(file.name) || failedFileNames.includes(file.name)
+      ));
       setSelectedFiles([]);
-      toast.success(`Successfully deleted ${selectedFiles.length} file(s)`);
     } catch (error) {
       console.error('Error deleting files:', error);
       toast.error('Failed to delete selected files');
@@ -191,11 +292,13 @@ const AdminMedia: React.FC = () => {
 
   const copyFileUrl = async (fileName: string) => {
     try {
-      const { data } = supabase.storage
-        .from('images')
-        .getPublicUrl(fileName);
+      const file = files.find(f => f.name === fileName);
+      if (!file) {
+        toast.error('File not found');
+        return;
+      }
 
-      await navigator.clipboard.writeText(data.publicUrl);
+      await navigator.clipboard.writeText(file.url);
       toast.success('File URL copied to clipboard');
     } catch (error) {
       console.error('Error copying URL:', error);
@@ -205,14 +308,17 @@ const AdminMedia: React.FC = () => {
 
   const downloadFile = async (fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('images')
-        .download(fileName);
+      const file = files.find(f => f.name === fileName);
+      if (!file) {
+        toast.error('File not found');
+        return;
+      }
 
-      if (error) throw error;
-
-      // Create download link
-      const url = URL.createObjectURL(data);
+      // Create download link using the blob URL
+      const response = await fetch(file.url);
+      const blob = await response.blob();
+      
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
@@ -229,18 +335,8 @@ const AdminMedia: React.FC = () => {
   };
 
   const getFileUrl = (fileName: string) => {
-    const { data } = supabase.storage
-      .from('images')
-      .getPublicUrl(fileName);
-    return data.publicUrl;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    const file = files.find(f => f.name === fileName);
+    return file?.url || '';
   };
 
   const formatDate = (dateString: string) => {
@@ -324,16 +420,18 @@ const AdminMedia: React.FC = () => {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Upload */}
-            <div className="relative">
+            <div className="flex items-center gap-2">
               <input
+                ref={fileInputRef}
                 type="file"
                 multiple
                 accept="image/*,video/*,.pdf,.doc,.docx,.txt"
                 onChange={handleFileUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="hidden"
                 disabled={uploading}
               />
               <Button
+                onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 className="btn-glow"
               >

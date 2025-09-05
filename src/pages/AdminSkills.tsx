@@ -27,10 +27,11 @@ interface Skill {
 }
 
 const skillCategories = [
-  'Frontend',
-  'Backend',
+  'AI Tools',
+  'Development', 
+  'Security',
+  'Cloud',
   'Database',
-  'DevOps',
   'Mobile',
   'Design',
   'Tools',
@@ -64,10 +65,11 @@ const AdminSkills: React.FC = () => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [newSkill, setNewSkill] = useState({
     name: '',
     level: 50,
-    category: 'Frontend',
+    category: 'Development',
     icon: ''
   });
 
@@ -158,6 +160,34 @@ const AdminSkills: React.FC = () => {
     } catch (error) {
       console.error('Error updating skill:', error);
       toast.error('Failed to update skill');
+    }
+  };
+
+  const startEditSkill = (skill: Skill) => {
+    setEditingSkill(skill);
+  };
+
+  const cancelEditSkill = () => {
+    setEditingSkill(null);
+  };
+
+  const saveEditSkill = async () => {
+    if (!editingSkill) return;
+    
+    try {
+      setSaving(true);
+      await updateSkill(editingSkill.id, {
+        name: editingSkill.name,
+        category: editingSkill.category,
+        level: editingSkill.level
+      });
+      setEditingSkill(null);
+      toast.success('Skill updated successfully');
+    } catch (error) {
+      console.error('Error updating skill:', error);
+      toast.error('Failed to update skill');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -337,14 +367,24 @@ const AdminSkills: React.FC = () => {
                         <span className="text-lg">{skill.icon}</span>
                         <span className="font-medium">{skill.name}</span>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteSkill(skill.id)}
-                        className="glass-card border-white/10 h-8 w-8 p-0"
-                      >
-                        <Trash size={14} />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditSkill(skill)}
+                          className="glass-card border-white/10 h-8 w-8 p-0"
+                        >
+                          <Code size={14} />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteSkill(skill.id)}
+                          className="glass-card border-white/10 h-8 w-8 p-0"
+                        >
+                          <Trash size={14} />
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
@@ -425,6 +465,89 @@ const AdminSkills: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Skill Modal */}
+      {editingSkill && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="glass-card border-white/10 w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Edit Skill</CardTitle>
+              <CardDescription>
+                Update skill information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Skill Name</label>
+                <Input
+                  placeholder="Enter skill name"
+                  value={editingSkill.name}
+                  onChange={(e) => setEditingSkill(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  className="glass-card border-white/10"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Category</label>
+                <Select
+                  value={editingSkill.category}
+                  onValueChange={(value) => setEditingSkill(prev => prev ? { ...prev, category: value } : null)}
+                >
+                  <SelectTrigger className="glass-card border-white/10">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skillCategories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Level ({editingSkill.level}%)</label>
+                <Input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={editingSkill.level}
+                  onChange={(e) => setEditingSkill(prev => prev ? { ...prev, level: parseInt(e.target.value) } : null)}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={saveEditSkill}
+                  disabled={saving || !editingSkill.name.trim()}
+                  className="btn-glow flex-1"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={cancelEditSkill}
+                  className="glass-card border-white/10"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FloppyDisk, Upload, Eye } from 'phosphor-react';
+import { FloppyDisk, Eye } from 'phosphor-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,12 +12,10 @@ const AdminHero: React.FC = () => {
     title: '',
     subtitle: '',
     description: '',
-    cta_text: 'Hire Me',
-    background_image: ''
+    cta_text: 'Hire Me'
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string>('');
 
   useEffect(() => {
     loadHeroContent();
@@ -38,7 +36,6 @@ const AdminHero: React.FC = () => {
 
       if (data) {
         setHeroData(data);
-        setPreviewImage(data.background_image || '');
       }
     } catch (error) {
       console.error('Error loading hero content:', error);
@@ -55,78 +52,43 @@ const AdminHero: React.FC = () => {
     }));
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Helper function to save hero data to database
+  const saveHeroDataToDatabase = async (dataToSave: Partial<HeroContent>) => {
+    const saveData = {
+      title: dataToSave.title || '',
+      subtitle: dataToSave.subtitle || '',
+      description: dataToSave.description || '',
+      // sub_description: dataToSave.sub_description || '', // Disabled until DB column is added
+      cta_text: dataToSave.cta_text || 'Hire Me',
+      updated_at: new Date().toISOString()
+    };
 
-    try {
-      setLoading(true);
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `hero-bg-${Date.now()}.${fileExt}`;
-      const filePath = `hero/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+    if (dataToSave.id) {
+      // Update existing
+      const { error } = await supabase
+        .from('hero_content')
+        .update(saveData)
+        .eq('id', dataToSave.id);
 
       if (error) throw error;
+    } else {
+      // Insert new
+      const { data, error } = await supabase
+        .from('hero_content')
+        .insert([saveData])
+        .select()
+        .single();
 
-      const { data: publicUrlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(data.path);
-
-      const imageUrl = publicUrlData.publicUrl;
-      setHeroData(prev => ({
-        ...prev,
-        background_image: imageUrl
-      }));
-      setPreviewImage(imageUrl);
-      toast.success('Image uploaded successfully');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
-    } finally {
-      setLoading(false);
+      if (error) throw error;
+      setHeroData(data);
     }
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
-
-      const saveData = {
-        title: heroData.title || '',
-        subtitle: heroData.subtitle || '',
-        description: heroData.description || '',
-        cta_text: heroData.cta_text || 'Hire Me',
-        background_image: heroData.background_image || null,
-        updated_at: new Date().toISOString()
-      };
-
-      if (heroData.id) {
-        // Update existing
-        const { error } = await supabase
-          .from('hero_content')
-          .update(saveData)
-          .eq('id', heroData.id);
-
-        if (error) throw error;
-      } else {
-        // Insert new
-        const { data, error } = await supabase
-          .from('hero_content')
-          .insert([saveData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setHeroData(data);
-      }
-
+      console.log('Saving hero data:', heroData); // Debug log
+      await saveHeroDataToDatabase(heroData);
       toast.success('Hero content saved successfully');
     } catch (error) {
       console.error('Error saving hero content:', error);
@@ -243,14 +205,15 @@ const AdminHero: React.FC = () => {
               </label>
               <Textarea
                 id="description"
-                placeholder="A brief description of who you are and what you do..."
+                placeholder={`Developer | Analyst | IT Support Specialist.
+Leveraging AI tools to enhance development workflows, security analysis, and system optimization. Creating efficient, intelligent solutions.`}
                 value={heroData.description || ''}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 rows={4}
                 className="glass-card border-white/10 focus:border-primary resize-none"
               />
               <p className="text-xs text-muted-foreground">
-                A compelling description of your skills and experience
+                Press Enter to create line breaks - they will appear exactly as you type them
               </p>
             </div>
 
@@ -271,81 +234,6 @@ const AdminHero: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Background Image */}
-        <Card className="glass-card border-white/10">
-          <CardHeader>
-            <CardTitle>Background Image</CardTitle>
-            <CardDescription>
-              Upload a background image for the hero section (optional)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Image Upload */}
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center hover:border-primary/50 transition-colors">
-                <input
-                  type="file"
-                  id="hero-image"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="hero-image"
-                  className="cursor-pointer flex flex-col items-center space-y-2"
-                >
-                  <Upload size={32} className="text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Upload background image</p>
-                    <p className="text-sm text-muted-foreground">
-                      PNG, JPG up to 10MB
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {/* Image Preview */}
-              {previewImage && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Preview</label>
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-muted/20">
-                    <img
-                      src={previewImage}
-                      alt="Hero background preview"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/40 to-background/20" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <h2 className="text-2xl font-bold text-white mb-2">
-                          {heroData.title || 'Preview Title'}
-                        </h2>
-                        <p className="text-white/80">
-                          {heroData.subtitle || 'Preview Subtitle'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Remove Image */}
-              {heroData.background_image && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setHeroData(prev => ({ ...prev, background_image: '' }));
-                    setPreviewImage('');
-                  }}
-                  className="w-full glass-card border-white/10 text-destructive hover:bg-destructive/10"
-                >
-                  Remove Background Image
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Preview Section */}
@@ -358,13 +246,6 @@ const AdminHero: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-background via-background/95 to-background">
-            {previewImage && (
-              <img
-                src={previewImage}
-                alt="Background"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
             <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/40 to-background/20" />
             
             <div className="absolute inset-0 flex items-center justify-center p-8">
@@ -380,7 +261,20 @@ const AdminHero: React.FC = () => {
                 </h1>
                 
                 <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
-                  {heroData.description || 'Your description will appear here...'}
+                  {heroData.description ? (
+                    (() => {
+                      // Split by line breaks and render each line
+                      const lines = heroData.description.split('\n');
+                      return lines.map((line, index) => (
+                        <span key={index}>
+                          {line}
+                          {index < lines.length - 1 && <br />}
+                        </span>
+                      ));
+                    })()
+                  ) : (
+                    'Your description will appear here...'
+                  )}
                 </p>
                 
                 <button className="btn-glow px-6 py-3 rounded-full font-semibold">

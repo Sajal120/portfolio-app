@@ -4,11 +4,8 @@ import {
   Envelope, 
   Trash,
   Eye,
-  EyeSlash,
   Clock,
-  User,
-  Check,
-  X
+  User
 } from 'phosphor-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -80,12 +77,6 @@ const AdminMessages: React.FC = () => {
         case 'read':
           filtered = filtered.filter(message => message.is_read);
           break;
-        case 'replied':
-          filtered = filtered.filter(message => message.is_replied);
-          break;
-        case 'pending':
-          filtered = filtered.filter(message => !message.is_replied);
-          break;
       }
 
       setFilteredMessages(filtered);
@@ -111,26 +102,6 @@ const AdminMessages: React.FC = () => {
     } catch (error) {
       console.error('Error marking message as read:', error);
       toast.error('Failed to mark message as read');
-    }
-  };
-
-  const markAsReplied = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({ is_replied: true })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setMessages(prev => prev.map(message =>
-        message.id === id ? { ...message, is_replied: true } : message
-      ));
-
-      toast.success('Message marked as replied');
-    } catch (error) {
-      console.error('Error marking message as replied:', error);
-      toast.error('Failed to mark message as replied');
     }
   };
 
@@ -167,30 +138,17 @@ const AdminMessages: React.FC = () => {
     });
   };
 
-  const getMessageStatusColor = (message: ContactMessage) => {
-    if (message.is_replied) return 'text-green-400';
-    if (message.is_read) return 'text-blue-400';
-    return 'text-yellow-400';
-  };
-
-  const getMessageStatusText = (message: ContactMessage) => {
-    if (message.is_replied) return 'Replied';
-    if (message.is_read) return 'Read';
-    return 'New';
-  };
-
   const openEmailClient = (message: ContactMessage) => {
-    const subject = `Re: ${message.subject}`;
-    const body = `\n\n---\nOriginal message from ${message.name}:\n${message.message}`;
+    const subject = `Re: Contact Form Message from ${message.name}`;
+    const body = `\n\n---\nOriginal message from ${message.name} (${message.email}):\n${message.message}`;
     const mailtoUrl = `mailto:${message.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailtoUrl);
     
-    // Mark as replied
-    markAsReplied(message.id);
+    // Mark as read
+    markAsRead(message.id);
   };
 
   const unreadCount = messages.filter(m => !m.is_read).length;
-  const repliedCount = messages.filter(m => m.is_replied).length;
 
   if (loading) {
     return (
@@ -229,10 +187,6 @@ const AdminMessages: React.FC = () => {
             <Clock className="mr-1" size={14} />
             {unreadCount} Unread
           </Badge>
-          <Badge variant="outline" className="glass-card border-green-400/20 text-green-400">
-            <Check className="mr-1" size={14} />
-            {repliedCount} Replied
-          </Badge>
         </div>
       </div>
 
@@ -256,8 +210,6 @@ const AdminMessages: React.FC = () => {
                 <SelectItem value="all">All Messages</SelectItem>
                 <SelectItem value="unread">Unread Only</SelectItem>
                 <SelectItem value="read">Read Only</SelectItem>
-                <SelectItem value="replied">Replied</SelectItem>
-                <SelectItem value="pending">Pending Reply</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -311,16 +263,15 @@ const AdminMessages: React.FC = () => {
                         <Badge
                           variant="outline"
                           className={`text-xs ${
-                            message.is_replied ? 'border-green-400/20 text-green-400' :
                             message.is_read ? 'border-blue-400/20 text-blue-400' :
                             'border-yellow-400/20 text-yellow-400'
                           }`}
                         >
-                          {getMessageStatusText(message)}
+                          {message.is_read ? 'Read' : 'New'}
                         </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground mb-1 truncate">
-                        {message.subject}
+                        {message.email}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {formatDate(message.created_at)}
@@ -347,25 +298,22 @@ const AdminMessages: React.FC = () => {
                     <Badge
                       variant="outline"
                       className={`${
-                        selectedMessage.is_replied ? 'border-green-400/20 text-green-400' :
                         selectedMessage.is_read ? 'border-blue-400/20 text-blue-400' :
                         'border-yellow-400/20 text-yellow-400'
                       }`}
                     >
-                      {getMessageStatusText(selectedMessage)}
+                      {selectedMessage.is_read ? 'Read' : 'New'}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!selectedMessage.is_replied && (
-                      <Button
-                        onClick={() => openEmailClient(selectedMessage)}
-                        className="btn-glow"
-                        size="sm"
-                      >
-                        <Envelope size={16} className="mr-2" />
-                        Reply
-                      </Button>
-                    )}
+                    <Button
+                      onClick={() => openEmailClient(selectedMessage)}
+                      className="btn-glow"
+                      size="sm"
+                    >
+                      <Envelope size={16} className="mr-2" />
+                      Reply
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -386,11 +334,6 @@ const AdminMessages: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h3 className="font-medium mb-2">Subject</h3>
-                  <p className="text-muted-foreground">{selectedMessage.subject}</p>
-                </div>
-                
-                <div>
                   <h3 className="font-medium mb-2">Message</h3>
                   <div className="p-4 bg-white/5 rounded-xl">
                     <p className="whitespace-pre-wrap text-muted-foreground leading-relaxed">
@@ -409,17 +352,6 @@ const AdminMessages: React.FC = () => {
                     >
                       <Eye size={16} className="mr-2" />
                       Mark as Read
-                    </Button>
-                  )}
-                  {!selectedMessage.is_replied && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => markAsReplied(selectedMessage.id)}
-                      className="glass-card border-white/10"
-                    >
-                      <Check size={16} className="mr-2" />
-                      Mark as Replied
                     </Button>
                   )}
                 </div>
@@ -442,7 +374,7 @@ const AdminMessages: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-3 gap-6">
         <Card className="glass-card border-white/10">
           <CardContent className="p-6 text-center">
             <div className="text-3xl font-bold text-primary mb-2">
@@ -458,15 +390,6 @@ const AdminMessages: React.FC = () => {
               {unreadCount}
             </div>
             <div className="text-sm text-muted-foreground">Unread</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-6 text-center">
-            <div className="text-3xl font-bold text-green-400 mb-2">
-              {repliedCount}
-            </div>
-            <div className="text-sm text-muted-foreground">Replied</div>
           </CardContent>
         </Card>
         

@@ -31,6 +31,16 @@ export interface HeroContent {
   updated_at: string;
 }
 
+export interface LoadingContent {
+  id: string;
+  name: string;
+  subtitle: string;
+  status_messages: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AboutContent {
   id: string;
   title: string;
@@ -61,6 +71,7 @@ export interface Project {
   title: string;
   description: string;
   image_url?: string;
+  original_image_url?: string;
   project_type: string;
   github_url?: string;
   live_url?: string;
@@ -213,6 +224,18 @@ export const getAboutContent = async () => {
   const { data, error } = await supabase
     .from('about_content')
     .select('*')
+    .limit(1)
+    .single();
+  
+  return { data, error };
+};
+
+export const getLoadingContent = async () => {
+  const { data, error } = await supabase
+    .from('loading_content')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
     .limit(1)
     .single();
   

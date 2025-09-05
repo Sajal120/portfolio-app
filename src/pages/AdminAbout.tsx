@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   User, 
   Camera, 
@@ -13,6 +13,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { supabase } from '../lib/supabase';
+import { uploadToBlob, validateFileType, validateFileSize } from '../lib/blobStorage';
 import toast from 'react-hot-toast';
 
 interface AboutContent {
@@ -44,6 +45,9 @@ const AdminAbout: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  // File input ref for triggering upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadAboutContent();
@@ -88,49 +92,58 @@ const AdminAbout: React.FC = () => {
     }
   };
 
+  // Helper function to save about data to database
+  const saveAboutDataToDatabase = async (dataToSave: AboutContent) => {
+    const contentToSave = {
+      ...dataToSave,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('about_content')
+      .upsert(contentToSave);
+
+    if (error) throw error;
+  };
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!validateFileType(file, ['image/'])) {
       toast.error('Please select an image file');
       return;
     }
 
     // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (!validateFileSize(file, 5)) {
       toast.error('Image must be less than 5MB');
       return;
     }
 
     try {
       setUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `profile-${Date.now()}.${fileExt}`;
-      const filePath = `about/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      
+      const { data, error } = await uploadToBlob(file, 'about');
 
       if (error) {
-        throw error;
+        throw new Error(error.message);
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(data.path);
+      if (data) {
+        const updatedContent = {
+          ...content,
+          profile_image: data.url
+        };
+        
+        setContent(updatedContent);
+        
+        // Auto-save the profile image to database
+        await saveAboutDataToDatabase(updatedContent);
 
-      setContent(prev => ({
-        ...prev,
-        profile_image: publicUrlData.publicUrl
-      }));
-
-      toast.success('Profile image uploaded successfully');
+        toast.success('Profile image uploaded and saved successfully');
+      }
     } catch (error) {
       console.error('Error uploading image:', error);
       toast.error('Failed to upload image');
@@ -142,18 +155,7 @@ const AdminAbout: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-
-      const contentToSave = {
-        ...content,
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('about_content')
-        .upsert(contentToSave);
-
-      if (error) throw error;
-
+      await saveAboutDataToDatabase(content);
       toast.success('About content saved successfully');
       loadAboutContent(); // Reload to get updated data
     } catch (error) {
@@ -171,11 +173,27 @@ const AdminAbout: React.FC = () => {
     }));
   };
 
-  const removeImage = () => {
-    setContent(prev => ({
-      ...prev,
-      profile_image: ''
-    }));
+  const removeImage = async () => {
+    if (!confirm('Are you sure you want to remove the profile image?')) {
+      return;
+    }
+    
+    try {
+      const updatedContent = {
+        ...content,
+        profile_image: ''
+      };
+      
+      setContent(updatedContent);
+      
+      // Auto-save the removal to database
+      await saveAboutDataToDatabase(updatedContent);
+      
+      toast.success('Profile image removed successfully');
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('Failed to remove image');
+    }
   };
 
   if (loading) {
@@ -264,15 +282,17 @@ const AdminAbout: React.FC = () => {
                 </div>
               )}
               
-              <div className="relative">
+              <div className="space-y-2">
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  className="hidden"
                   disabled={uploading}
                 />
                 <Button
+                  onClick={() => fileInputRef.current?.click()}
                   variant="outline"
                   className="w-full glass-card border-white/10"
                   disabled={uploading}
@@ -289,6 +309,18 @@ const AdminAbout: React.FC = () => {
                     </>
                   )}
                 </Button>
+                
+                {/* Remove Image Button */}
+                {content.profile_image && (
+                  <Button
+                    onClick={removeImage}
+                    variant="outline"
+                    className="w-full glass-card border-white/10 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash size={16} className="mr-2" />
+                    Remove Image
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

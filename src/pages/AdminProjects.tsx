@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash, Eye, Upload } from 'phosphor-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Pencil, Trash, Eye, Upload, ArrowCounterClockwise } from 'phosphor-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -7,7 +7,45 @@ import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { supabase, Project } from '../lib/supabase';
+import { uploadToBlob, validateFileType, validateFileSize } from '../lib/blobStorage';
 import toast from 'react-hot-toast';
+
+// Import original project images
+import fertilityAppImage from '../assets/fertility-app-women.jpg';
+import moviePlatformImage from '../assets/movie-platform.jpg';
+import devopsOptimizerImage from '../assets/devops-optimizer.jpg';
+import portfolio3dImage from '../assets/portfolio-3d.jpg';
+import marketplaceBiddingImage from '../assets/marketplace-bidding.jpg';
+import vrPlatformImage from '../assets/vr-platform.jpg';
+
+// Mapping of project titles to their original images
+const originalImages: { [key: string]: string } = {
+  "Movie Discovery Platform": moviePlatformImage,
+  "DevOps Cost Optimizer": devopsOptimizerImage,
+  "3D Portfolio Website": portfolio3dImage,
+  "Marketplace Bidding System": marketplaceBiddingImage,
+  "VR Learning Platform": vrPlatformImage,
+  "VR Experience Platform": vrPlatformImage,
+  "Fertility Health App": fertilityAppImage
+};
+
+// Function to find matching original image with flexible matching
+const findOriginalImage = (title: string): string | null => {
+  // First try exact match
+  if (originalImages[title]) {
+    return originalImages[title];
+  }
+  
+  // Then try partial matching (check if any original title is contained in the current title)
+  for (const [originalTitle, image] of Object.entries(originalImages)) {
+    if (title.toLowerCase().includes(originalTitle.toLowerCase()) || 
+        originalTitle.toLowerCase().includes(title.toLowerCase())) {
+      return image;
+    }
+  }
+  
+  return null;
+};
 
 const AdminProjects: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -15,6 +53,7 @@ const AdminProjects: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadProjects();
@@ -75,6 +114,8 @@ const AdminProjects: React.FC = () => {
         github_url: editingProject.github_url || null,
         live_url: editingProject.live_url || null,
         image_url: editingProject.image_url || null,
+        // Store original image if this is a new project or if original_image_url is not set
+        // original_image_url: editingProject.original_image_url || editingProject.image_url || null, // Temporarily disabled until DB column is added
         is_featured: editingProject.is_featured ?? true,
         is_active: editingProject.is_active ?? true,
         sort_order: editingProject.sort_order || projects.length + 1,
@@ -130,36 +171,75 @@ const AdminProjects: React.FC = () => {
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🔄 Upload button clicked, file input triggered');
     const file = event.target.files?.[0];
-    if (!file || !editingProject) return;
+    console.log('📎 Selected file:', file?.name, file?.size, file?.type);
+    
+    if (!file || !editingProject) {
+      console.log('❌ No file selected or no project being edited');
+      return;
+    }
+
+    // Validate file type
+    if (!validateFileType(file, ['image/'])) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (!validateFileSize(file, 10)) {
+      toast.error('Image must be less than 10MB');
+      return;
+    }
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `project-${Date.now()}.${fileExt}`;
-      const filePath = `projects/${fileName}`;
+      console.log('🔄 Starting upload to Vercel Blob...');
+      const { data, error } = await uploadToBlob(file, 'projects');
 
-      const { data, error } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      if (error) {
+        throw new Error(error.message);
+      }
 
-      if (error) throw error;
+      if (data) {
+        console.log('✅ Upload successful! URL:', data.url);
+        setEditingProject(prev => ({
+          ...prev!,
+          image_url: data.url
+        }));
+        
+        toast.success('Image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error uploading image:', error);
+      toast.error('Failed to upload image');
+    }
+  };
 
-      const { data: publicUrlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(data.path);
+  const handleRevertToOriginal = async () => {
+    if (!editingProject?.title) {
+      toast.error('No project title found');
+      return;
+    }
 
+    console.log('Trying to revert for title:', editingProject.title);
+
+    // For now, only use mapped images (database storage will be enabled after column is added)
+    const originalImage = findOriginalImage(editingProject.title);
+
+    if (!originalImage) {
+      toast.error(`No original image found for "${editingProject.title}".`);
+      return;
+    }
+
+    try {
       setEditingProject(prev => ({
         ...prev!,
-        image_url: publicUrlData.publicUrl
+        image_url: originalImage
       }));
-      
-      toast.success('Image uploaded successfully');
+      toast.success('Reverted to original image');
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      console.error('Error reverting image:', error);
+      toast.error('Failed to revert image');
     }
   };
 
@@ -238,11 +318,11 @@ const AdminProjects: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <CardTitle className="text-lg line-clamp-1">{project.title}</CardTitle>
-                  <CardDescription className="mt-1">
+                  <div className="mt-1">
                     <Badge variant="secondary" className="text-xs">
                       {project.project_type}
                     </Badge>
-                  </CardDescription>
+                  </div>
                 </div>
                 <div className="flex space-x-1">
                   <Button
@@ -386,26 +466,51 @@ const AdminProjects: React.FC = () => {
                 <label className="text-sm font-medium">Project Image</label>
                 <div className="flex items-center space-x-4">
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    id="project-image"
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
                   />
-                  <label
-                    htmlFor="project-image"
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
                     className="cursor-pointer flex items-center space-x-2 px-4 py-2 glass-card border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
                   >
                     <Upload size={16} />
                     <span className="text-sm">Upload Image</span>
-                  </label>
+                  </button>
+                  {/* Show revert button if we can find a matching original image */}
+                  {editingProject.title && findOriginalImage(editingProject.title) && (
+                    <button
+                      type="button"
+                      onClick={handleRevertToOriginal}
+                      className="cursor-pointer flex items-center space-x-2 px-4 py-2 glass-card border border-amber-500/30 rounded-lg hover:bg-amber-500/10 transition-colors text-amber-400"
+                    >
+                      <ArrowCounterClockwise size={16} />
+                      <span className="text-sm">Revert to Original</span>
+                    </button>
+                  )}
+                  {/* Debug info - remove this later */}
+                  {editingProject.title && (
+                    <div className="text-xs text-gray-400">
+                      Title: "{editingProject.title}" | Mapped Original: {findOriginalImage(editingProject.title) ? 'Yes' : 'No'}
+                    </div>
+                  )}
                   {editingProject.image_url && (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted/20">
-                      <img
-                        src={editingProject.image_url}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted/20">
+                        <img
+                          src={editingProject.image_url}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {editingProject.title && editingProject.image_url === findOriginalImage(editingProject.title) && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-white">✓</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1,9 +1,74 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Envelope } from 'phosphor-react';
+import { supabase } from '../lib/supabase';
 
 gsap.registerPlugin(ScrollTrigger);
+
+// Fallback skills data
+const defaultSkills = [
+  // AI Tools & Integration
+  { name: 'AI Agents', icon: '🤖', level: 92, category: 'AI Tools' },
+  { name: 'OpenAI API', icon: '🌟', level: 95, category: 'AI Tools' },
+  { name: 'Claude API', icon: '🎭', level: 90, category: 'AI Tools' },
+  { name: 'AI Integration', icon: '🔗', level: 88, category: 'AI Tools' },
+  { name: 'Prompt Engineering', icon: '🎯', level: 95, category: 'AI Tools' },
+  { name: 'AI-Assisted Coding', icon: '💻', level: 92, category: 'AI Tools' },
+  { name: 'LangChain', icon: '🔗', level: 85, category: 'AI Tools' },
+  { name: 'Hugging Face', icon: '🤗', level: 80, category: 'AI Tools' },
+  
+  // Core Development Skills
+  { name: 'JavaScript', icon: '🟨', level: 95, category: 'Development' },
+  { name: 'React', icon: '⚛️', level: 95, category: 'Development' },
+  { name: 'TypeScript', icon: '🔷', level: 88, category: 'Development' },
+  { name: 'Python', icon: '🐍', level: 88, category: 'Development' },
+  { name: 'Node.js', icon: '💚', level: 90, category: 'Development' },
+  { name: 'PHP', icon: '🐘', level: 85, category: 'Development' },
+  { name: 'C#', icon: '🔵', level: 82, category: 'Development' },
+  { name: 'Java', icon: '☕', level: 80, category: 'Development' },
+  { name: 'Next.js', icon: '⚡', level: 88, category: 'Development' },
+  { name: 'Prisma ORM', icon: '🔺', level: 88, category: 'Development' },
+  { name: 'Drizzle ORM', icon: '💧', level: 82, category: 'Development' },
+  { name: 'Neon Database', icon: '🟢', level: 85, category: 'Development' },
+  { name: 'Payload CMS', icon: '📦', level: 85, category: 'Development' },
+  { name: 'Supabase', icon: '⚡', level: 90, category: 'Development' },
+  { name: 'Firebase', icon: '🔥', level: 85, category: 'Development' },
+  { name: 'MongoDB', icon: '🍃', level: 85, category: 'Development' },
+  { name: 'MySQL', icon: '🐬', level: 88, category: 'Development' },
+  { name: 'PostgreSQL', icon: '🐘', level: 85, category: 'Development' },
+  { name: 'Git/GitHub', icon: '🐙', level: 92, category: 'Development' },
+  { name: 'AWS', icon: '☁️', level: 85, category: 'Development' },
+  { name: 'Terraform', icon: '🏗️', level: 80, category: 'Development' },
+  
+  // Security Skills
+  { name: 'Vulnerability Assessment', icon: '🔍', level: 85, category: 'Security' },
+  { name: 'Risk Management', icon: '⚖️', level: 88, category: 'Security' },
+  { name: 'Incident Response', icon: '🚨', level: 85, category: 'Security' },
+  { name: 'SIEM (Splunk)', icon: '📊', level: 80, category: 'Security' },
+  { name: 'Wireshark', icon: '🦈', level: 82, category: 'Security' },
+  { name: 'Nessus', icon: '🔍', level: 80, category: 'Security' },
+  { name: 'Burp Suite', icon: '🔧', level: 78, category: 'Security' },
+  { name: 'OWASP Top 10', icon: '🛡️', level: 88, category: 'Security' },
+  { name: 'Secure Coding', icon: '🔐', level: 90, category: 'Security' },
+  { name: 'Active Directory', icon: '🏢', level: 88, category: 'Security' },
+  { name: 'IAM Policies', icon: '👤', level: 85, category: 'Security' },
+  { name: 'Network Security', icon: '🌐', level: 85, category: 'Security' },
+  { name: 'ISO 27001', icon: '📋', level: 78, category: 'Security' },
+  { name: 'NIST Framework', icon: '🏛️', level: 80, category: 'Security' },
+  
+  // IT Support Skills
+  { name: 'Help Desk Management', icon: '🎧', level: 95, category: 'IT Support' },
+  { name: 'Ticketing Systems', icon: '🎫', level: 92, category: 'IT Support' },
+  { name: 'Remote Support', icon: '💻', level: 90, category: 'IT Support' },
+  { name: 'Hardware Troubleshooting', icon: '🔧', level: 88, category: 'IT Support' },
+  { name: 'Network Diagnostics', icon: '🌐', level: 85, category: 'IT Support' },
+  { name: 'User Training', icon: '👥', level: 90, category: 'IT Support' },
+  { name: 'System Administration', icon: '⚙️', level: 88, category: 'IT Support' },
+  { name: 'Software Installation', icon: '📥', level: 92, category: 'IT Support' },
+  { name: 'Windows Administration', icon: '🪟', level: 90, category: 'IT Support' },
+  { name: 'macOS Support', icon: '🍎', level: 85, category: 'IT Support' }
+];
 
 const AboutSection = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -11,75 +76,74 @@ const AboutSection = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const skillsRef = useRef<HTMLDivElement>(null);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [aboutData, setAboutData] = useState<{
+    title?: string;
+    subtitle?: string;
+    description?: string;
+    profile_image?: string;
+    years_experience?: number;
+    projects_completed?: number;
+    technical_skills?: number;
+  }>({});
+  const [skills, setSkills] = useState<Array<{
+    name: string;
+    icon?: string;
+    level: number;
+    category: string;
+  }>>([]);
 
-  const skills = [
-    // AI Tools & Integration
-    { name: 'AI Agents', icon: '🤖', level: 92, category: 'AI Tools' },
-    { name: 'OpenAI API', icon: '🌟', level: 95, category: 'AI Tools' },
-    { name: 'Claude API', icon: '🎭', level: 90, category: 'AI Tools' },
-    { name: 'AI Integration', icon: '🔗', level: 88, category: 'AI Tools' },
-    { name: 'Prompt Engineering', icon: '🎯', level: 95, category: 'AI Tools' },
-    { name: 'AI-Assisted Coding', icon: '💻', level: 92, category: 'AI Tools' },
-    { name: 'LangChain', icon: '🔗', level: 85, category: 'AI Tools' },
-    { name: 'Hugging Face', icon: '🤗', level: 80, category: 'AI Tools' },
-    
-    // Core Development Skills
-    { name: 'JavaScript', icon: '🟨', level: 95, category: 'Development' },
-    { name: 'React', icon: '⚛️', level: 95, category: 'Development' },
-    { name: 'TypeScript', icon: '🔷', level: 88, category: 'Development' },
-    { name: 'Python', icon: '🐍', level: 88, category: 'Development' },
-    { name: 'Node.js', icon: '💚', level: 90, category: 'Development' },
-    { name: 'PHP', icon: '🐘', level: 85, category: 'Development' },
-    { name: 'C#', icon: '🔵', level: 82, category: 'Development' },
-    { name: 'Java', icon: '☕', level: 80, category: 'Development' },
-    { name: 'Next.js', icon: '⚡', level: 88, category: 'Development' },
-    { name: 'Prisma ORM', icon: '🔺', level: 88, category: 'Development' },
-    { name: 'Drizzle ORM', icon: '💧', level: 82, category: 'Development' },
-    { name: 'Neon Database', icon: '🟢', level: 85, category: 'Development' },
-    { name: 'Payload CMS', icon: '📦', level: 85, category: 'Development' },
-    { name: 'Supabase', icon: '⚡', level: 90, category: 'Development' },
-    { name: 'Firebase', icon: '🔥', level: 85, category: 'Development' },
-    { name: 'MongoDB', icon: '🍃', level: 85, category: 'Development' },
-    { name: 'MySQL', icon: '🐬', level: 88, category: 'Development' },
-    { name: 'PostgreSQL', icon: '🐘', level: 85, category: 'Development' },
-    { name: 'Git/GitHub', icon: '🐙', level: 92, category: 'Development' },
-    { name: 'AWS', icon: '☁️', level: 85, category: 'Development' },
-    { name: 'Terraform', icon: '🏗️', level: 80, category: 'Development' },
-    
-    // Security Skills
-    { name: 'Vulnerability Assessment', icon: '🔍', level: 85, category: 'Security' },
-    { name: 'Risk Management', icon: '⚖️', level: 88, category: 'Security' },
-    { name: 'Incident Response', icon: '🚨', level: 85, category: 'Security' },
-    { name: 'SIEM (Splunk)', icon: '📊', level: 80, category: 'Security' },
-    { name: 'Wireshark', icon: '🦈', level: 82, category: 'Security' },
-    { name: 'Nessus', icon: '🔍', level: 80, category: 'Security' },
-    { name: 'Burp Suite', icon: '🔧', level: 78, category: 'Security' },
-    { name: 'OWASP Top 10', icon: '🛡️', level: 88, category: 'Security' },
-    { name: 'Secure Coding', icon: '🔐', level: 90, category: 'Security' },
-    { name: 'Active Directory', icon: '🏢', level: 88, category: 'Security' },
-    { name: 'IAM Policies', icon: '👤', level: 85, category: 'Security' },
-    { name: 'Network Security', icon: '🌐', level: 85, category: 'Security' },
-    { name: 'ISO 27001', icon: '📋', level: 78, category: 'Security' },
-    { name: 'NIST Framework', icon: '🏛️', level: 80, category: 'Security' },
-    
-    // IT Support Skills
-    { name: 'Troubleshooting', icon: '🛠️', level: 95, category: 'IT Support' },
-    { name: 'Windows Administration', icon: '🪟', level: 92, category: 'IT Support' },
-    { name: 'macOS Support', icon: '🍎', level: 88, category: 'IT Support' },
-    { name: 'Linux Basics', icon: '🐧', level: 82, category: 'IT Support' },
-    { name: 'DNS/DHCP', icon: '🌐', level: 88, category: 'IT Support' },
-    { name: 'TCP/IP Networking', icon: '📡', level: 85, category: 'IT Support' },
-    { name: 'VPN Configuration', icon: '🔒', level: 85, category: 'IT Support' },
-    { name: 'Group Policy', icon: '📋', level: 88, category: 'IT Support' },
-    { name: 'Endpoint Security', icon: '🛡️', level: 90, category: 'IT Support' },
-    { name: 'BitLocker/FDE', icon: '🔐', level: 85, category: 'IT Support' },
-    { name: 'Backup & Recovery', icon: '💾', level: 88, category: 'IT Support' },
-    { name: 'Microsoft 365', icon: '📊', level: 92, category: 'IT Support' },
-    { name: 'Google Workspace', icon: '🔍', level: 88, category: 'IT Support' },
-    { name: 'JIRA/ServiceNow', icon: '🎫', level: 85, category: 'IT Support' },
-    { name: 'Oracle Micros POS', icon: '💳', level: 90, category: 'IT Support' },
-    { name: 'Deputy Systems', icon: '📅', level: 92, category: 'IT Support' }
-  ];
+  // Load about content and skills from database
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load about content
+        const { data: aboutData, error: aboutError } = await supabase
+          .from('about_content')
+          .select('*')
+          .limit(1)
+          .single();
+
+        if (!aboutError && aboutData) {
+          console.log('Loaded about data:', aboutData);
+          console.log('Profile image URL:', aboutData.profile_image);
+          setAboutData(aboutData);
+        } else {
+          console.log('No about data found or error:', aboutError);
+        }
+
+        // Load skills
+        const { data: skillsData, error: skillsError } = await supabase
+          .from('skills')
+          .select('*')
+          .order('level', { ascending: false });
+
+        if (!skillsError && skillsData && skillsData.length > 0) {
+          console.log('✅ Loaded skills from database:', skillsData.length, 'skills');
+          console.log('First 3 skills:', skillsData.slice(0, 3));
+          setSkills(skillsData);
+        } else {
+          console.log('❌ No skills found in database, using fallback. Error:', skillsError);
+          console.log('Skills data:', skillsData);
+          // Keep the hardcoded skills as fallback
+          setSkills(defaultSkills);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Keep the hardcoded skills as fallback
+        setSkills(defaultSkills);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Debug: Log when skills change
+  useEffect(() => {
+    console.log('🔄 Skills state updated:', skills.length, 'skills');
+    if (skills.length > 0) {
+      console.log('Categories:', [...new Set(skills.map(s => s.category))]);
+    }
+  }, [skills]);
 
   const filterButtons = ['All', 'AI Tools', 'Development', 'Security', 'IT Support'];
 
@@ -159,11 +223,11 @@ const AboutSection = () => {
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-6xl font-bold mb-4">
             <span className="bg-gradient-primary bg-clip-text text-transparent">
-              About Me
+              {aboutData.title || "About Me"}
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Passionate about creating digital solutions that make a difference
+            {aboutData.subtitle || "Passionate about creating digital solutions that make a difference"}
           </p>
         </div>
 
@@ -177,10 +241,15 @@ const AboutSection = () => {
               {/* Profile image container */}
               <div className="relative w-full h-full rounded-full overflow-hidden glass-card border-4 border-white/20 group hover:scale-105 transition-transform duration-500">
                 <img
-                  src="/lovable-uploads/7957a48c-b6ce-4e62-a999-09a1565abddb.png"
+                  src={aboutData.profile_image || "/lovable-uploads/7957a48c-b6ce-4e62-a999-09a1565abddb.png"}
                   alt="Sajal Basnet"
                   className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
                   style={{ objectPosition: 'center top' }}
+                  onLoad={() => console.log('Image loaded successfully:', aboutData.profile_image || 'default image')}
+                  onError={(e) => {
+                    console.error('Image failed to load:', aboutData.profile_image);
+                    console.error('Error details:', e);
+                  }}
                 />
                 
                 {/* Hover overlay */}
@@ -197,31 +266,43 @@ const AboutSection = () => {
           <div ref={contentRef} className="space-y-8">
             <div>
               <h3 className="text-3xl font-bold mb-4 text-glow">Developer | Security Analyst | IT Support | AI-Enhanced</h3>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                Versatile IT professional with comprehensive expertise across software development, security analysis, and IT support. 
-                Master of Software Development – Swinburne University (Sep 2022 – May 2024) | GPA: 3.688/4.0 | Golden Key International Honour Society – Top 15% 
-                Enhanced by AI tools and modern automation to deliver innovative, efficient solutions.
-              </p>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                From full-stack development with modern frameworks to implementing enterprise security solutions and providing 
-                comprehensive IT support, I leverage AI tools to enhance every aspect of my work. My experience spans from 
-                developing secure applications with AI-assisted coding to conducting security analysis with intelligent automation, 
-                while managing complex IT infrastructures and delivering exceptional user support through AI-enhanced workflows.
-              </p>
+              <div className="text-lg text-muted-foreground leading-relaxed">
+                {aboutData.description ? (
+                  aboutData.description.split('\n').map((paragraph, index) => (
+                    <p key={index} className="mb-6 last:mb-0">
+                      {paragraph}
+                    </p>
+                  ))
+                ) : (
+                  <>
+                    <p className="mb-6">
+                      Versatile IT professional with comprehensive expertise across software development, security analysis, and IT support. 
+                      Master of Software Development – Swinburne University (Sep 2022 – May 2024) | GPA: 3.688/4.0 | Golden Key International Honour Society – Top 15% 
+                      Enhanced by AI tools and modern automation to deliver innovative, efficient solutions.
+                    </p>
+                    <p>
+                      From full-stack development with modern frameworks to implementing enterprise security solutions and providing 
+                      comprehensive IT support, I leverage AI tools to enhance every aspect of my work. My experience spans from 
+                      developing secure applications with AI-assisted coding to conducting security analysis with intelligent automation, 
+                      while managing complex IT infrastructures and delivering exceptional user support through AI-enhanced workflows.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Key Stats */}
             <div className="grid grid-cols-3 gap-6">
               <div className="text-center glass-card p-4 rounded-xl">
-                <div className="text-3xl font-bold text-primary">3+</div>
+                <div className="text-3xl font-bold text-primary">{aboutData.years_experience || 3}+</div>
                 <div className="text-sm text-muted-foreground">Years Experience</div>
               </div>
               <div className="text-center glass-card p-4 rounded-xl">
-                <div className="text-3xl font-bold text-secondary">20+</div>
+                <div className="text-3xl font-bold text-secondary">{aboutData.technical_skills || 20}+</div>
                 <div className="text-sm text-muted-foreground">Technical Skills</div>
               </div>
               <div className="text-center glass-card p-4 rounded-xl">
-                <div className="text-3xl font-bold text-accent">15+</div>
+                <div className="text-3xl font-bold text-accent">{aboutData.projects_completed || 15}+</div>
                 <div className="text-sm text-muted-foreground">Projects Completed</div>
               </div>
             </div>
@@ -251,6 +332,43 @@ const AboutSection = () => {
                 {filter}
               </button>
             ))}
+          </div>
+
+          {/* Debug info for skills source */}
+          <div className="text-center mb-6 p-3 bg-blue-500/20 border border-blue-400/30 rounded-lg text-blue-200 text-sm">
+            📊 Skills: {skills.length} total | Source: {skills.length === defaultSkills.length ? '🔧 Fallback' : '💾 Database'} | 
+            Showing: {filteredSkills.length} {activeFilter === 'All' ? 'all' : activeFilter}
+            {skills.length === defaultSkills.length && (
+              <button
+                onClick={async () => {
+                  const testSkills = [
+                    { name: 'React', level: 95, category: 'Development', icon: '⚛️' },
+                    { name: 'TypeScript', level: 90, category: 'Development', icon: '🔷' },
+                    { name: 'Python', level: 88, category: 'Development', icon: '🐍' },
+                    { name: 'AI Integration', level: 92, category: 'AI Tools', icon: '🤖' },
+                    { name: 'Cybersecurity', level: 85, category: 'Security', icon: '🛡️' }
+                  ];
+                  try {
+                    const { data, error } = await supabase.from('skills').insert(testSkills).select();
+                    if (error) throw error;
+                    console.log('✅ Added test skills:', data);
+                    // Reload skills
+                    const { data: newSkills, error: loadError } = await supabase
+                      .from('skills')
+                      .select('*')
+                      .order('level', { ascending: false });
+                    if (!loadError && newSkills) {
+                      setSkills(newSkills);
+                    }
+                  } catch (err) {
+                    console.error('❌ Error adding test skills:', err);
+                  }
+                }}
+                className="ml-4 px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-white text-xs"
+              >
+                + Add Test Skills
+              </button>
+            )}
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">

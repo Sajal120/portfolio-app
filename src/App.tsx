@@ -8,9 +8,14 @@ import AdminProjects from "./pages/AdminProjects";
 import AdminAbout from "./pages/AdminAbout";
 import AdminSkills from "./pages/AdminSkills";
 import AdminContactInfo from "./pages/AdminContactInfo";
-import AdminMessages from "./pages/AdminMessages";
+import SimpleContactAdmin from "./pages/SimpleContactAdmin";
+import AdminFooter from "./pages/AdminFooter";
+import ContactFormTest from "./pages/ContactFormTest";
+import AdminLoading from "./pages/AdminLoading";
+import DatabaseTest from "./pages/DatabaseTest";
 import AdminMedia from "./pages/AdminMedia";
 import AdminContactSection from "./pages/AdminContactSection";
+import BlobStorageTest from "./pages/BlobStorageTest";
 import DataSeeder from "./pages/DataSeeder";
 import SupabaseTest from "./pages/SupabaseTest";
 import DebugAuth from "./pages/DebugAuth";
@@ -27,6 +32,7 @@ import SimpleAdminLogin from "./components/SimpleAdminLogin";
 import AdminLayout from "./components/AdminLayout";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminHero from "./pages/AdminHero";
+import HeroTest from "./pages/HeroTest";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 
@@ -59,6 +65,9 @@ const App = () => (
             <Route path="/connection-test" element={<SupabaseConnectionTest />} />
             <Route path="/quick-test" element={<QuickTest />} />
             <Route path="/data-test" element={<DataTest />} />
+            <Route path="/hero-test" element={<HeroTest />} />
+            <Route path="/contact-test" element={<ContactFormTest />} />
+            <Route path="/db-test" element={<DatabaseTest />} />
             <Route path="/simple-dashboard" element={<SimpleAdminDashboard />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/simple-login" element={<SimpleAdminLogin />} />
@@ -68,14 +77,16 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="loading" element={<AdminLoading />} />
               <Route path="hero" element={<AdminHero />} />
               <Route path="about" element={<AdminAbout />} />
               <Route path="skills" element={<AdminSkills />} />
               <Route path="projects" element={<AdminProjects />} />
-              <Route path="contact" element={<AdminContactInfo />} />
+              <Route path="contact" element={<SimpleContactAdmin />} />
+              <Route path="footer" element={<AdminFooter />} />
               <Route path="contact-section" element={<AdminContactSection />} />
-              <Route path="messages" element={<AdminMessages />} />
               <Route path="media" element={<AdminMedia />} />
+              <Route path="blob-test" element={<BlobStorageTest />} />
               <Route path="seeder" element={<DataSeeder />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

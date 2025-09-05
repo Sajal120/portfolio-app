@@ -49,15 +49,20 @@ const Index = () => {
   }, [isLoading]);
 
   const handleLoadingComplete = () => {
+    console.log('Loading completed - hiding loading screen');
     setIsLoading(false);
     
     // Delay content appearance for smooth transition
     setTimeout(() => {
+      console.log('Showing content');
       setShowContent(true);
     }, 100);
   };
 
+  console.log('Index component rendered - isLoading:', isLoading, 'showContent:', showContent);
+
   if (isLoading) {
+    console.log('Rendering loading animation');
     return <LoadingAnimation onComplete={handleLoadingComplete} />;
   }
 

@@ -24,14 +24,21 @@ import toast from 'react-hot-toast';
 
 interface ContactInfo {
   id: string;
-  type: string;
-  label: string;
-  value: string;
+  type?: string;
+  label?: string;
+  value?: string;
   icon?: string;
-  is_public: boolean;
-  display_order: number;
-  created_at: string;
-  updated_at: string;
+  is_public?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+  // Legacy fields that might exist
+  phone?: string;
+  email?: string;
+  location?: string;
+  github_url?: string;
+  linkedin_url?: string;
+  bio?: string;
 }
 
 const contactTypes = [
@@ -68,12 +75,104 @@ const AdminContactInfo: React.FC = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('contact_info')
-        .select('*')
-        .order('display_order', { ascending: true });
+        .select('*');
 
       if (error) throw error;
 
-      setContacts(data || []);
+      // Transform the existing table structure to our expected format
+      const transformedContacts: ContactInfo[] = [];
+      
+      if (data && data.length > 0) {
+        data.forEach((item, index) => {
+          const baseId = item.id || `item-${index}`;
+          
+          if (item.phone) {
+            transformedContacts.push({
+              id: `phone-${baseId}`,
+              type: 'phone',
+              label: 'Phone',
+              value: item.phone,
+              icon: '📱',
+              is_public: true,
+              display_order: 1,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+          
+          if (item.email) {
+            transformedContacts.push({
+              id: `email-${baseId}`,
+              type: 'email',
+              label: 'Email',
+              value: item.email,
+              icon: '📧',
+              is_public: true,
+              display_order: 2,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+          
+          if (item.location) {
+            transformedContacts.push({
+              id: `location-${baseId}`,
+              type: 'address',
+              label: 'Location',
+              value: item.location,
+              icon: '📍',
+              is_public: true,
+              display_order: 3,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+          
+          if (item.github_url) {
+            transformedContacts.push({
+              id: `github-${baseId}`,
+              type: 'github',
+              label: 'GitHub',
+              value: item.github_url,
+              icon: '👨‍💻',
+              is_public: true,
+              display_order: 4,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+          
+          if (item.linkedin_url) {
+            transformedContacts.push({
+              id: `linkedin-${baseId}`,
+              type: 'linkedin',
+              label: 'LinkedIn',
+              value: item.linkedin_url,
+              icon: '💼',
+              is_public: true,
+              display_order: 5,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+          
+          if (item.bio) {
+            transformedContacts.push({
+              id: `bio-${baseId}`,
+              type: 'other',
+              label: 'Bio',
+              value: item.bio,
+              icon: '📝',
+              is_public: true,
+              display_order: 6,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            });
+          }
+        });
+      }
+
+      setContacts(transformedContacts);
     } catch (error) {
       console.error('Error loading contact info:', error);
       toast.error('Failed to load contact information');
@@ -91,16 +190,55 @@ const AdminContactInfo: React.FC = () => {
     try {
       setSaving(true);
       
-      const contactType = contactTypes.find(type => type.value === newContact.type);
-      const maxOrder = Math.max(...contacts.map(c => c.display_order), 0);
-
-      const contactToAdd = {
-        ...newContact,
-        icon: contactType?.icon || '🔗',
-        display_order: maxOrder + 1,
+      // Since the current table has a different structure, let's work with it
+      // Map the new contact type to the existing table structure
+      interface LegacyContactInfo {
+        phone: string;
+        email: string;
+        location: string;
+        github_url: string;
+        linkedin_url: string;
+        bio: string;
+        created_at: string;
+        updated_at: string;
+      }
+      
+      const contactToAdd: LegacyContactInfo = {
+        phone: '',
+        email: '',
+        location: '',
+        github_url: '',
+        linkedin_url: '',
+        bio: '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      switch (newContact.type) {
+        case 'phone':
+          contactToAdd.phone = newContact.value;
+          contactToAdd.bio = newContact.label;
+          break;
+        case 'email':
+          contactToAdd.email = newContact.value;
+          contactToAdd.bio = newContact.label;
+          break;
+        case 'address':
+          contactToAdd.location = newContact.value;
+          contactToAdd.bio = newContact.label;
+          break;
+        case 'github':
+          contactToAdd.github_url = newContact.value;
+          contactToAdd.bio = newContact.label;
+          break;
+        case 'linkedin':
+          contactToAdd.linkedin_url = newContact.value;
+          contactToAdd.bio = newContact.label;
+          break;
+        default:
+          // For other types, use bio field
+          contactToAdd.bio = `${newContact.label}: ${newContact.value}`;
+      }
 
       const { error } = await supabase
         .from('contact_info')
@@ -167,44 +305,9 @@ const AdminContactInfo: React.FC = () => {
   };
 
   const moveContact = async (id: string, direction: 'up' | 'down') => {
-    const contactIndex = contacts.findIndex(c => c.id === id);
-    if (contactIndex === -1) return;
-
-    const newIndex = direction === 'up' ? contactIndex - 1 : contactIndex + 1;
-    if (newIndex < 0 || newIndex >= contacts.length) return;
-
-    const updatedContacts = [...contacts];
-    [updatedContacts[contactIndex], updatedContacts[newIndex]] = 
-    [updatedContacts[newIndex], updatedContacts[contactIndex]];
-
-    // Update display orders
-    updatedContacts.forEach((contact, index) => {
-      contact.display_order = index + 1;
-    });
-
-    setContacts(updatedContacts);
-
-    // Update in database
-    try {
-      const updates = updatedContacts.map(contact => ({
-        id: contact.id,
-        display_order: contact.display_order,
-        updated_at: new Date().toISOString()
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('contact_info')
-          .update({ display_order: update.display_order, updated_at: update.updated_at })
-          .eq('id', update.id);
-      }
-
-      toast.success('Contact order updated successfully');
-    } catch (error) {
-      console.error('Error updating contact order:', error);
-      toast.error('Failed to update contact order');
-      loadContactInfo(); // Reload on error
-    }
+    // Temporarily disabled until database migration
+    toast.error('Reordering will be available after database migration');
+    return;
   };
 
   const getContactIcon = (type: string) => {

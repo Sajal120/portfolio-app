@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ArrowUpRight, Globe } from 'phosphor-react';
+import { ArrowUpRight, GithubLogo, Globe } from 'phosphor-react';
 import { supabase } from '../lib/supabase';
 import fertilityAppImage from '../assets/fertility-app-women.jpg';
 import moviePlatformImage from '../assets/movie-platform.jpg';
@@ -12,118 +12,204 @@ import vrPlatformImage from '../assets/vr-platform.jpg';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// Fallback projects (used when database is empty)
+// Fallback projects data (used when database is empty or unavailable)
 const defaultProjects = [
   {
     id: 1,
     title: "Movie Discovery Platform",
     description: "A modern movie platform built with React and TMDB API featuring real-time data, advanced search, and personalized recommendations.",
-    image: moviePlatformImage,
-    tech: ["React", "JavaScript", "TMDB API", "CSS3"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "Web Application"
+    image_url: moviePlatformImage,
+    technologies: ["React", "JavaScript", "TMDB API", "CSS3"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "Web Application",
+    is_featured: true,
+    is_active: true
   },
   {
     id: 2,
     title: "DevOps Cost Optimizer",
     description: "Automated AWS cost tracking solution using Terraform and Python, reducing cloud spend by 30% through intelligent resource management.",
-    image: devopsOptimizerImage,
-    tech: ["Python", "AWS", "Terraform", "Grafana"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "DevOps Tool"
+    image_url: devopsOptimizerImage,
+    technologies: ["Python", "AWS", "Terraform", "Grafana"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "DevOps Tool",
+    is_featured: true,
+    is_active: true
   },
   {
     id: 3,
     title: "3D Portfolio Website",
     description: "Immersive portfolio experience featuring 3D animations, smooth scrolling, and interactive elements built with cutting-edge web technologies.",
-    image: portfolio3dImage,
-    tech: ["React", "Three.js", "GSAP", "Spline"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "Portfolio"
+    image_url: portfolio3dImage,
+    technologies: ["React", "Three.js", "GSAP", "Spline"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "Portfolio",
+    is_featured: true,
+    is_active: true
   },
   {
     id: 4,
     title: "Marketplace Bidding System",
     description: "E-commerce marketplace with real-time bidding functionality, secure payment processing, and comprehensive vendor management.",
-    image: marketplaceBiddingImage,
-    tech: ["React", "Node.js", "MongoDB", "Socket.io"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "E-commerce"
+    image_url: marketplaceBiddingImage,
+    technologies: ["React", "Node.js", "MongoDB", "Socket.io"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "E-commerce",
+    is_featured: true,
+    is_active: true
   },
   {
     id: 5,
-    title: "VR Learning Platform",
-    description: "Virtual reality educational platform for immersive learning experiences with interactive 3D environments and progress tracking.",
-    image: vrPlatformImage,
-    tech: ["Unity", "C#", "VR SDKs", "WebRTC"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "VR Application"
+    title: "Fertility Health App",
+    description: "Women's health tracking application with AI-powered insights, cycle prediction, and personalized health recommendations.",
+    image_url: fertilityAppImage,
+    technologies: ["React Native", "AI/ML", "Firebase", "Health APIs"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "Mobile App",
+    is_featured: false,
+    is_active: true
   },
   {
     id: 6,
-    title: "Fertility Health App",
-    description: "Cross-platform women's health application built with Xamarin featuring cycle tracking, interactive charts and data visualization for informed reproductive health decisions.",
-    image: fertilityAppImage,
-    tech: ["Xamarin", "C#", "Charts", "Mobile"],
-    github: "https://github.com/Sajal120",
-    live: "#",
-    type: "Mobile App"
+    title: "VR Learning Platform",
+    description: "Virtual reality educational platform for immersive learning experiences with interactive 3D environments and progress tracking.",
+    image_url: vrPlatformImage,
+    technologies: ["Unity", "C#", "VR SDKs", "WebRTC"],
+    github_url: "https://github.com/Sajal120",
+    live_demo_url: "#",
+    project_type: "VR Application",
+    is_featured: false,
+    is_active: true
   }
 ];
 
 const ProjectsSection = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
-  const [projects, setProjects] = useState(defaultProjects);
+  const [projects, setProjects] = useState<Array<{
+    id: number;
+    title: string;
+    description: string;
+    image_url: string;
+    technologies: string[];
+    github_url?: string;
+    live_demo_url?: string;
+    project_type: string;
+    is_featured?: boolean;
+    is_active?: boolean;
+  }>>([]);
 
   // Load projects from database
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: projectsData, error: projectsError } = await supabase
           .from('projects')
           .select('*')
           .eq('is_active', true)
           .order('sort_order', { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          console.log('✅ Loaded projects from database:', data.length);
-          // Transform database format to component format
-          const transformedProjects = data.map(project => ({
+        if (!projectsError && projectsData && projectsData.length > 0) {
+          console.log('✅ Loaded projects from database:', projectsData.length, 'projects');
+          // Transform database data to match component structure
+          const transformedProjects = projectsData.map(project => ({
             id: project.id,
             title: project.title,
             description: project.description,
-            image: project.image_url || defaultProjects[0].image,
-            tech: project.technologies || [],
-            github: project.github_url || '#',
-            live: project.live_demo_url || '#',
-            type: project.project_type || 'Web Application'
+            image_url: project.image_url || '',
+            technologies: project.technologies || [],
+            github_url: project.github_url,
+            live_demo_url: project.live_demo_url,
+            project_type: project.project_type,
+            is_featured: project.is_featured,
+            is_active: project.is_active
           }));
           setProjects(transformedProjects);
         } else {
-          console.log('❌ No projects found in database, using fallback');
+          console.log('❌ No projects found in database, using fallback. Error:', projectsError);
+          setProjects(defaultProjects);
         }
       } catch (error) {
         console.error('Error loading projects:', error);
+        setProjects(defaultProjects);
       }
     };
 
     loadProjects();
-    
-    // Refresh projects when window gains focus (when switching from admin)
-    const handleFocus = () => {
-      console.log('🔄 Window focused, reloading projects...');
-      loadProjects();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
   }, []);
+
+  // Debug: Log when projects change
+  useEffect(() => {
+    console.log('🔄 Projects state updated:', projects.length, 'projects');
+  }, [projects]);
+
+  useEffect(() => {
+    {
+      id: 1,
+      title: "Movie Discovery Platform",
+      description: "A modern movie platform built with React and TMDB API featuring real-time data, advanced search, and personalized recommendations.",
+      image: moviePlatformImage,
+      tech: ["React", "JavaScript", "TMDB API", "CSS3"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "Web Application"
+    },
+    {
+      id: 2,
+      title: "DevOps Cost Optimizer",
+      description: "Automated AWS cost tracking solution using Terraform and Python, reducing cloud spend by 30% through intelligent resource management.",
+      image: devopsOptimizerImage,
+      tech: ["Python", "AWS", "Terraform", "Grafana"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "DevOps Tool"
+    },
+    {
+      id: 3,
+      title: "3D Portfolio Website",
+      description: "Immersive portfolio experience featuring 3D animations, smooth scrolling, and interactive elements built with cutting-edge web technologies.",
+      image: portfolio3dImage,
+      tech: ["React", "Three.js", "GSAP", "Spline"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "Portfolio"
+    },
+    {
+      id: 4,
+      title: "Marketplace Bidding System",
+      description: "Secure online auction platform with real-time bidding, payment integration, and comprehensive user management system.",
+      image: marketplaceBiddingImage,
+      tech: ["PHP", "JavaScript", "Ajax", "MySQL"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "E-commerce"
+    },
+    {
+      id: 5,
+      title: "VR Experience Platform",
+      description: "Immersive VR experiences using Present4D with panoramic content optimization for multi-device compatibility.",
+      image: vrPlatformImage,
+      tech: ["VR", "Present4D", "JavaScript", "WebXR"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "VR Application"
+    },
+    {
+      id: 6,
+      title: "Fertility Health App",
+      description: "Cross-platform women's health application built with Xamarin featuring cycle tracking, interactive charts and data visualization for informed reproductive health decisions.",
+      image: fertilityAppImage,
+      tech: ["Xamarin", "C#", "Charts", "Mobile"],
+      github: "https://github.com/Sajal120",
+      live: "#",
+      type: "Mobile App"
+    }
+  ];
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -189,21 +275,13 @@ const ProjectsSection = () => {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Showcasing innovative solutions built with cutting-edge technologies
           </p>
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 text-center text-sm text-blue-400">
-              Data source: {projects.length === defaultProjects.length ? 'Fallback (default)' : 'Database'}
-            </div>
-          )}
         </div>
 
         <div ref={projectsRef} className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {projects.map((project) => (
-            <a
+            <div
               key={project.id}
-              href={project.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="project-card glass-card rounded-2xl overflow-hidden group cursor-pointer block hover:transform hover:scale-105 transition-all duration-300"
+              className="project-card glass-card rounded-2xl overflow-hidden group cursor-pointer"
             >
               {/* Project Image */}
               <div className="relative h-48 overflow-hidden">
@@ -215,17 +293,24 @@ const ProjectsSection = () => {
                 
                 {/* Overlay */}
                 <div className="project-overlay absolute inset-0 bg-gradient-primary/80 opacity-0 flex items-center justify-center gap-4 transition-opacity duration-300">
-                  {project.live && project.live !== "#" && (
-                    <a
-                      href={project.live}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors duration-300"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Globe size={20} />
-                    </a>
-                  )}
+                  <a
+                    href={project.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors duration-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <GithubLogo size={20} />
+                  </a>
+                  <a
+                    href={project.live}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors duration-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Globe size={20} />
+                  </a>
                 </div>
 
                 {/* Project Type Badge */}
@@ -260,14 +345,14 @@ const ProjectsSection = () => {
 
                 {/* Action Button */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">View on GitHub</span>
+                  <span className="text-sm text-muted-foreground">View Details</span>
                   <ArrowUpRight 
                     size={20} 
                     className="group-hover:transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300" 
                   />
                 </div>
               </div>
-            </a>
+            </div>
           ))}
         </div>
 

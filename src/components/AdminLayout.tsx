@@ -11,7 +11,8 @@ import {
   ChartLine,
   Image,
   MessengerLogo,
-  AddressBook
+  AddressBook,
+  Sparkle
 } from 'phosphor-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from './ui/button';
@@ -40,6 +41,12 @@ const AdminLayout: React.FC = () => {
       label: 'Dashboard',
       path: '/admin',
       description: 'Overview and analytics'
+    },
+    {
+      icon: Sparkle,
+      label: 'Loading Page',
+      path: '/admin/loading',
+      description: 'Edit loading screen content'
     },
     {
       icon: User,
@@ -76,6 +83,12 @@ const AdminLayout: React.FC = () => {
       label: 'Contact Section',
       path: '/admin/contact-section',
       description: 'Edit contact section content'
+    },
+    {
+      icon: Gear,
+      label: 'Footer Settings',
+      path: '/admin/footer',
+      description: 'Customize footer content'
     },
     {
       icon: MessengerLogo,

@@ -1,12 +1,155 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Heart, GithubLogo, LinkedinLogo, EnvelopeSimple } from 'phosphor-react';
+import { GithubLogo, LinkedinLogo, EnvelopeSimple } from 'phosphor-react';
+import { supabase } from '../lib/supabase';
 
 gsap.registerPlugin(ScrollTrigger);
 
+interface FooterContent {
+  brand_name: string;
+  description: string;
+  copyright_text: string;
+  location: string;
+  phone: string;
+  email: string;
+}
+
 const Footer = () => {
   const footerRef = useRef<HTMLDivElement>(null);
+  const [footerData, setFooterData] = useState<FooterContent>({
+    brand_name: 'Sajal Basnet',
+    description: 'IT professional specializing in support, security, and development. Dedicated to protecting systems, solving complex problems, and building secure digital solutions. Ready to strengthen your technology infrastructure.',
+    copyright_text: '© 2025 Sajal Basnet. All rights reserved.',
+    location: 'Auburn, Sydney, NSW',
+    phone: '+61 424 425 793',
+    email: 'basnetsajal120@gmail.com'
+  });
+  const [socialLinks, setSocialLinks] = useState<Array<{
+    icon: React.ReactNode;
+    href: string;
+    label: string;
+  }>>([]);
+
+  useEffect(() => {
+    loadFooterContent();
+    loadSocialLinks();
+  }, []);
+
+  const loadFooterContent = () => {
+    try {
+      const savedContent = localStorage.getItem('footer_content');
+      if (savedContent) {
+        const parsedContent = JSON.parse(savedContent);
+        setFooterData(prev => ({
+          ...prev,
+          ...parsedContent
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading footer content:', error);
+    }
+  };
+
+  const loadSocialLinks = async () => {
+    try {
+      const { data: contactInfo, error } = await supabase
+        .from('contact_info')
+        .select('*');
+
+      if (error) {
+        console.error('Error loading social links:', error);
+        // Fallback to default links
+        setDefaultSocialLinks();
+        return;
+      }
+
+      if (contactInfo && contactInfo.length > 0) {
+        // Extract social links from existing table structure
+        const socialLinksData = [];
+        const item = contactInfo[0]; // Assuming single row
+        
+        if (item.github_url) {
+          socialLinksData.push({
+            icon: getSocialIcon('github'),
+            href: formatContactValue('github', item.github_url),
+            label: 'GitHub'
+          });
+        }
+        
+        if (item.linkedin_url) {
+          socialLinksData.push({
+            icon: getSocialIcon('linkedin'),
+            href: formatContactValue('linkedin', item.linkedin_url),
+            label: 'LinkedIn'
+          });
+        }
+        
+        if (socialLinksData.length > 0) {
+          setSocialLinks(socialLinksData);
+        } else {
+          setDefaultSocialLinks();
+        }
+      } else {
+        setDefaultSocialLinks();
+      }
+    } catch (error) {
+      console.error('Error loading social links:', error);
+      setDefaultSocialLinks();
+    }
+  };
+
+  const setDefaultSocialLinks = () => {
+    setSocialLinks([
+      {
+        icon: <GithubLogo size={20} />,
+        href: 'https://github.com/Sajal120',
+        label: 'GitHub'
+      },
+      {
+        icon: <LinkedinLogo size={20} />,
+        href: 'https://linkedin.com/in/sajal-basnet-7926aa188',
+        label: 'LinkedIn'
+      },
+      {
+        icon: <EnvelopeSimple size={20} />,
+        href: `mailto:${footerData.email}`,
+        label: 'Email'
+      }
+    ]);
+  };
+
+  const getSocialIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'github':
+        return <GithubLogo size={20} />;
+      case 'linkedin':
+        return <LinkedinLogo size={20} />;
+      case 'twitter':
+        return <EnvelopeSimple size={20} />; // Use envelope as fallback
+      case 'instagram':
+        return <EnvelopeSimple size={20} />; // Use envelope as fallback
+      default:
+        return <EnvelopeSimple size={20} />;
+    }
+  };
+
+  const formatContactValue = (type: string, value: string) => {
+    switch (type.toLowerCase()) {
+      case 'email':
+        return `mailto:${value}`;
+      case 'phone':
+        return `tel:${value.replace(/\s/g, '')}`;
+      case 'website':
+      case 'linkedin':
+      case 'github':
+      case 'twitter':
+      case 'instagram':
+        return value.startsWith('http') ? value : `https://${value}`;
+      default:
+        return value;
+    }
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -60,26 +203,8 @@ const Footer = () => {
     { name: 'Contact', href: '#contact' }
   ];
 
-  const socialLinks = [
-    {
-      icon: <GithubLogo size={20} />,
-      href: 'https://github.com/Sajal120',
-      label: 'GitHub'
-    },
-    {
-      icon: <LinkedinLogo size={20} />,
-      href: 'https://linkedin.com/in/sajal-basnet-7926aa188',
-      label: 'LinkedIn'
-    },
-    {
-      icon: <EnvelopeSimple size={20} />,
-      href: 'mailto:basnetsajal120@gmail.com',
-      label: 'Email'
-    }
-  ];
-
   return (
-    <footer ref={footerRef} className="relative py-16 mt-20 overflow-hidden">
+    <footer ref={footerRef} className="relative py-16 mt-8 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
       
@@ -95,13 +220,11 @@ const Footer = () => {
             <div className="md:col-span-2">
               <div className="text-3xl font-bold mb-4">
                 <span className="bg-gradient-primary bg-clip-text text-transparent">
-                  Sajal Basnet
+                  {footerData.brand_name}
                 </span>
               </div>
               <p className="text-muted-foreground mb-6 max-w-md">
-                IT professional specializing in support, security, and development. Dedicated to 
-                protecting systems, solving complex problems, and building secure digital solutions. 
-                Ready to strengthen your technology infrastructure.
+                {footerData.description}
               </p>
               
               {/* Social Links */}
@@ -144,9 +267,9 @@ const Footer = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Get In Touch</h3>
               <div className="space-y-2 text-muted-foreground">
-                <p>Auburn, Sydney, NSW</p>
-                <p>+61 424 425 793</p>
-                <p>basnetsajal120@gmail.com</p>
+                <p>{footerData.location}</p>
+                <p>{footerData.phone}</p>
+                <p>{footerData.email}</p>
               </div>
             </div>
           </div>
@@ -155,11 +278,7 @@ const Footer = () => {
           <div className="border-t border-white/10 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="text-muted-foreground text-sm">
-                © 2025 Sajal Basnet. All rights reserved.
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Made with <Heart size={16} className="text-red-500 animate-pulse" /> using React & GSAP
+                {footerData.copyright_text}
               </div>
             </div>
           </div>

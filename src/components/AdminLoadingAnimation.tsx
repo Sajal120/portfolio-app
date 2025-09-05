@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useLoadingContent } from '../hooks/useLoadingContent';
 
-interface LoadingAnimationProps {
+interface AdminLoadingAnimationProps {
   onComplete: () => void;
 }
 
@@ -128,8 +127,7 @@ function LoadingScene() {
   );
 }
 
-const LoadingAnimation = ({ onComplete }: LoadingAnimationProps) => {
-  const { content, loading } = useLoadingContent();
+const AdminLoadingAnimation = ({ onComplete }: AdminLoadingAnimationProps) => {
   const preloaderRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
@@ -137,22 +135,7 @@ const LoadingAnimation = ({ onComplete }: LoadingAnimationProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
 
-  // Get status message based on progress
-  const getStatusMessage = (progress: number) => {
-    const messages = content.status_messages;
-    if (messages.length === 0) return '';
-    
-    const progressPercentage = Math.floor(progress / (100 / messages.length));
-    const index = Math.min(progressPercentage, messages.length - 1);
-    return messages[index] || messages[0];
-  };
-
   useEffect(() => {
-    // Wait for content to be loaded before starting animation
-    if (loading) {
-      return;
-    }
-
     const tl = gsap.timeline();
     
     // Initial setup
@@ -181,7 +164,7 @@ const LoadingAnimation = ({ onComplete }: LoadingAnimationProps) => {
     // Progress bar animation with counter
     tl.to(progressBarRef.current, {
       width: "100%",
-      duration: 3,
+      duration: 2.5,
       ease: "power2.out",
       onUpdate: function() {
         const currentProgress = Math.round(this.progress() * 100);
@@ -208,7 +191,7 @@ const LoadingAnimation = ({ onComplete }: LoadingAnimationProps) => {
       scale: 0.8,
       duration: 0.8,
       ease: "power2.in",
-      delay: 0.5,
+      delay: 0.3,
       stagger: 0.1
     });
 
@@ -232,102 +215,98 @@ const LoadingAnimation = ({ onComplete }: LoadingAnimationProps) => {
     return () => {
       tl.kill();
     };
-  }, [onComplete, loading]);
+  }, [onComplete]);
 
   return (
     <div
       ref={preloaderRef}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-background via-background/95 to-background overflow-hidden"
     >
-      {/* Show a simple loading state while content is being fetched */}
-      {loading ? (
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      {/* Animated background grid */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="grid grid-cols-20 grid-rows-20 w-full h-full">
+          {[...Array(400)].map((_, i) => (
+            <div
+              key={i}
+              className="border border-primary/20"
+              style={{
+                animationDelay: `${Math.random() * 3}s`,
+                animation: `pulse 3s infinite ${Math.random() * 2}s`
+              }}
+            />
+          ))}
         </div>
-      ) : (
-        <>
-          {/* Animated background grid */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="grid grid-cols-20 grid-rows-20 w-full h-full">
-              {[...Array(400)].map((_, i) => (
-                <div
-                  key={i}
-                  className="border border-primary/20"
-                  style={{
-                    animationDelay: `${Math.random() * 3}s`,
-                    animation: `pulse 3s infinite ${Math.random() * 2}s`
-                  }}
-                />
-              ))}
-            </div>
+      </div>
+
+      {/* 3D Canvas */}
+      <div ref={canvasRef} className="absolute inset-0">
+        <Canvas
+          camera={{ position: [0, 0, 8], fov: 60 }}
+          style={{ background: 'transparent' }}
+        >
+          <LoadingScene />
+        </Canvas>
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 text-center">
+        {/* Logo/Name */}
+        <div ref={logoRef} className="mb-12">
+          <h1 className="text-7xl md:text-9xl font-bold text-glow mb-4">
+            <span className="bg-gradient-primary bg-clip-text text-transparent">
+              Sajal
+            </span>
+          </h1>
+          <div className="relative">
+            <p className="text-2xl text-muted-foreground font-light tracking-wider">
+              Admin Panel
+            </p>
+            <div className="absolute -inset-2 bg-gradient-primary opacity-20 blur-xl rounded-full" />
           </div>
+        </div>
 
-          {/* 3D Canvas */}
-          <div ref={canvasRef} className="absolute inset-0">
-            <Canvas
-              camera={{ position: [0, 0, 8], fov: 60 }}
-              style={{ background: 'transparent' }}
-            >
-              <LoadingScene />
-            </Canvas>
+        {/* Progress bar container */}
+        <div className="w-96 mx-auto">
+          <div className="relative h-2 bg-muted/30 rounded-full overflow-hidden backdrop-blur-sm border border-white/10">
+            <div
+              ref={progressBarRef}
+              className="absolute top-0 left-0 h-full bg-gradient-primary rounded-full shadow-lg"
+              style={{ 
+                width: "0%",
+                boxShadow: '0 0 20px rgba(0, 212, 255, 0.5)'
+              }}
+            />
           </div>
-
-          {/* Main content */}
-          <div className="relative z-10 text-center">
-            {/* Logo/Name */}
-            <div ref={logoRef} className="mb-12">
-              <h1 className="text-7xl md:text-9xl font-bold text-glow mb-4">
-                <span className="bg-gradient-primary bg-clip-text text-transparent">
-                  {content.name}
-                </span>
-              </h1>
-              <div className="relative">
-                <p className="text-2xl text-muted-foreground font-light tracking-wider">
-                  {content.subtitle}
-                </p>
-                <div className="absolute -inset-2 bg-gradient-primary opacity-20 blur-xl rounded-full" />
-              </div>
-            </div>
-
-            {/* Progress bar container */}
-            <div className="w-96 mx-auto">
-              <div className="relative h-2 bg-muted/30 rounded-full overflow-hidden backdrop-blur-sm border border-white/10">
-                <div
-                  ref={progressBarRef}
-                  className="absolute top-0 left-0 h-full bg-gradient-primary rounded-full shadow-lg"
-                  style={{ 
-                    width: "0%",
-                    boxShadow: '0 0 20px rgba(0, 212, 255, 0.5)'
-                  }}
-                />
-              </div>
-              
-              {/* Percentage */}
-              <div
-                ref={percentageRef}
-                className="text-lg text-primary font-mono font-bold mt-6 tracking-wider"
-                style={{ textShadow: '0 0 10px rgba(0, 212, 255, 0.5)' }}
-              >
-                0%
-              </div>
-            </div>
-
-            {/* Status text */}
-            <div className="mt-8 text-sm text-muted-foreground/60 font-light">
-              {getStatusMessage(progress)}
-            </div>
+          
+          {/* Percentage */}
+          <div
+            ref={percentageRef}
+            className="text-lg text-primary font-mono font-bold mt-6 tracking-wider"
+            style={{ textShadow: '0 0 10px rgba(0, 212, 255, 0.5)' }}
+          >
+            0%
           </div>
+        </div>
 
-          {/* Corner decorations */}
-          <div className="absolute top-10 left-10 w-20 h-20 border-l-2 border-t-2 border-primary/30" />
-          <div className="absolute top-10 right-10 w-20 h-20 border-r-2 border-t-2 border-primary/30" />
-          <div className="absolute bottom-10 left-10 w-20 h-20 border-l-2 border-b-2 border-primary/30" />
-          <div className="absolute bottom-10 right-10 w-20 h-20 border-r-2 border-b-2 border-primary/30" />
-        </>
-      )}
+        {/* Status text */}
+        <div className="mt-8 text-sm text-muted-foreground/60 font-light">
+          {progress < 15 && "Initializing admin environment..."}
+          {progress >= 15 && progress < 30 && "Loading dashboard components..."}
+          {progress >= 30 && progress < 45 && "Configuring security protocols..."}
+          {progress >= 45 && progress < 60 && "Setting up content management..."}
+          {progress >= 60 && progress < 75 && "Loading admin tools..."}
+          {progress >= 75 && progress < 90 && "Optimizing interface..."}
+          {progress >= 90 && "Admin panel ready..."}
+        </div>
+      </div>
+
+      {/* Corner decorations */}
+      <div className="absolute top-10 left-10 w-20 h-20 border-l-2 border-t-2 border-primary/30" />
+      <div className="absolute top-10 right-10 w-20 h-20 border-r-2 border-t-2 border-primary/30" />
+      <div className="absolute bottom-10 left-10 w-20 h-20 border-l-2 border-b-2 border-primary/30" />
+      <div className="absolute bottom-10 right-10 w-20 h-20 border-r-2 border-b-2 border-primary/30" />
     </div>
   );
 };
 
-export default LoadingAnimation;
+export default AdminLoadingAnimation;

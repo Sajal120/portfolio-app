@@ -44,17 +44,98 @@ const ContactSection = () => {
         });
       }
 
-      // Load contact information
+      // Load contact information from existing table structure
       const { data: contactInfoData, error: contactError } = await supabase
         .from('contact_info')
-        .select('*')
-        .eq('is_public', true)
-        .order('display_order', { ascending: true });
+        .select('*');
 
       if (contactError) {
         console.error('Error loading contact info:', contactError);
+        // Set fallback contact info
+        setContactInfo([
+          { id: '1', type: 'phone', label: 'Phone', value: '+61 424 425 793', icon: '📱', is_public: true, display_order: 1 },
+          { id: '2', type: 'email', label: 'Email', value: 'basnetsajal120@gmail.com', icon: '📧', is_public: true, display_order: 2 },
+          { id: '3', type: 'address', label: 'Location', value: 'Auburn, Sydney, NSW', icon: '📍', is_public: true, display_order: 3 },
+          { id: '4', type: 'github', label: 'GitHub', value: 'https://github.com/Sajal120', icon: '👨‍💻', is_public: true, display_order: 4 },
+          { id: '5', type: 'linkedin', label: 'LinkedIn', value: 'https://linkedin.com/in/sajal-basnet-7926aa188', icon: '💼', is_public: true, display_order: 5 }
+        ]);
       } else {
-        setContactInfo(contactInfoData || []);
+        // Transform legacy data structure to expected format
+        const transformedData: Array<{
+          id: string;
+          type: string;
+          label: string;
+          value: string;
+          icon?: string;
+          is_public: boolean;
+          display_order: number;
+        }> = [];
+        
+        if (contactInfoData && contactInfoData.length > 0) {
+          const item = contactInfoData[0]; // Assuming single row
+          
+          if (item.phone) {
+            transformedData.push({
+              id: `phone-${item.id}`,
+              type: 'phone',
+              label: 'Phone',
+              value: item.phone,
+              icon: '📱',
+              is_public: true,
+              display_order: 1
+            });
+          }
+          
+          if (item.email) {
+            transformedData.push({
+              id: `email-${item.id}`,
+              type: 'email',
+              label: 'Email',
+              value: item.email,
+              icon: '📧',
+              is_public: true,
+              display_order: 2
+            });
+          }
+          
+          if (item.location) {
+            transformedData.push({
+              id: `location-${item.id}`,
+              type: 'address',
+              label: 'Location',
+              value: item.location,
+              icon: '📍',
+              is_public: true,
+              display_order: 3
+            });
+          }
+          
+          if (item.github_url) {
+            transformedData.push({
+              id: `github-${item.id}`,
+              type: 'github',
+              label: 'GitHub',
+              value: item.github_url,
+              icon: '👨‍💻',
+              is_public: true,
+              display_order: 4
+            });
+          }
+          
+          if (item.linkedin_url) {
+            transformedData.push({
+              id: `linkedin-${item.id}`,
+              type: 'linkedin',
+              label: 'LinkedIn',
+              value: item.linkedin_url,
+              icon: '💼',
+              is_public: true,
+              display_order: 5
+            });
+          }
+        }
+        
+        setContactInfo(transformedData);
       }
 
     } catch (error) {
@@ -155,7 +236,7 @@ const ContactSection = () => {
   }
 
   return (
-    <section id="contact" ref={sectionRef} className="py-20 relative overflow-hidden">
+    <section id="contact" ref={sectionRef} className="py-20 pb-10 relative overflow-hidden">
       {/* Background elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary/5 rounded-full blur-3xl" />
@@ -199,28 +280,6 @@ const ContactSection = () => {
                   </div>
                 </a>
               ))}
-            </div>
-
-            {/* Social Links */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Follow Me</h4>
-              <div className="flex gap-4">
-                {contactInfo
-                  .filter(info => ['github', 'linkedin', 'twitter', 'instagram'].includes(info.type.toLowerCase()))
-                  .map((social, index) => (
-                    <a
-                      key={social.id}
-                      href={formatContactValue(social.type, social.value)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="contact-item w-12 h-12 glass-card rounded-xl flex items-center justify-center hover:bg-primary/20 transition-all duration-300 group"
-                    >
-                      <div className="group-hover:scale-110 transition-transform duration-300">
-                        {social.icon ? <span className="text-lg">{social.icon}</span> : getContactIcon(social.type)}
-                      </div>
-                    </a>
-                  ))}
-              </div>
             </div>
           </div>
 

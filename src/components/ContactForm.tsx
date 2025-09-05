@@ -3,8 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Card, CardContent } from './ui/card';
-import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import emailjs from '@emailjs/browser';
 
 interface ContactFormProps {
   className?: string;
@@ -27,6 +27,67 @@ const ContactForm: React.FC<ContactFormProps> = ({ className }) => {
     }));
   };
 
+  const sendEmailNotification = async (name: string, email: string, subject: string, message: string) => {
+    try {
+      // Check if EmailJS is configured
+      const emailjsPublicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+      const emailjsServiceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      
+      if (emailjsPublicKey && emailjsServiceId && emailjsPublicKey !== 'your_public_key_here') {
+        // Initialize EmailJS with your public key
+        emailjs.init(emailjsPublicKey);
+
+        // Send notification to admin
+        await emailjs.send(
+          emailjsServiceId,
+          import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_contact',
+          {
+            from_name: name,
+            from_email: email,
+            subject: subject || 'New Contact Form Submission',
+            message: message,
+            to_email: 'basnetsajal120@gmail.com',
+            reply_to: email,
+          }
+        );
+
+        // Send auto-reply to user
+        await emailjs.send(
+          emailjsServiceId,
+          import.meta.env.VITE_EMAILJS_AUTO_REPLY_TEMPLATE_ID || 'template_auto_reply',
+          {
+            to_name: name,
+            to_email: email,
+            from_name: 'Sajal Basnet',
+            message: `Thank you for contacting me! I have received your message and will get back to you within 24 hours.\n\nYour message:\n"${message}"`,
+          }
+        );
+
+        console.log('Email notifications sent successfully via EmailJS');
+        return { success: true, method: 'emailjs' };
+      } else {
+        // Fallback to mailto link with simple formatting
+        const subjectLine = subject ? `Portfolio Contact: ${subject}` : 'Portfolio Contact Form Submission';
+        const body = `${message}
+
+--
+From: ${name} (${email})
+Sent via Portfolio Contact Form`;
+
+        const mailtoUrl = `mailto:basnetsajal120@gmail.com?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+        
+        // Open user's email client
+        window.open(mailtoUrl, '_blank');
+        
+        console.log('Email notification sent via mailto');
+        return { success: true, method: 'mailto' };
+      }
+    } catch (error) {
+      console.error('Email sending failed:', error);
+      return { success: false, error };
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -45,21 +106,23 @@ const ContactForm: React.FC<ContactFormProps> = ({ className }) => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
-        .from('contact_messages')
-        .insert([{
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          subject: formData.subject.trim() || 'New Contact Form Submission',
-          message: formData.message.trim(),
-          is_read: false,
-          is_replied: false,
-          created_at: new Date().toISOString()
-        }]);
+      // Send email notification directly
+      const emailResult = await sendEmailNotification(
+        formData.name.trim(),
+        formData.email.trim(),
+        formData.subject.trim(),
+        formData.message.trim()
+      );
 
-      if (error) throw error;
-
-      toast.success('Thank you! Your message has been sent successfully.');
+      if (emailResult.success) {
+        if (emailResult.method === 'emailjs') {
+          toast.success('Thank you! Your message has been sent via email.');
+        } else {
+          toast.success('Thank you! Your email client will open with your message ready to send.');
+        }
+      } else {
+        toast.error('Failed to prepare your message. Please try again or contact directly via email.');
+      }
       
       // Reset form
       setFormData({

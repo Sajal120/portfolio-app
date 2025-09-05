@@ -19,6 +19,7 @@ const HeroSection = () => {
       try {
         const { data, error } = await getHeroContent();
         if (!error && data) {
+          console.log('Loaded hero data:', data); // Debug log
           setHeroData(data);
         }
       } catch (error) {
@@ -29,6 +30,14 @@ const HeroSection = () => {
     };
 
     loadHeroData();
+
+    // Also reload when window gains focus (useful when switching from admin)
+    const handleFocus = () => {
+      loadHeroData();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   useEffect(() => {
@@ -110,7 +119,7 @@ const HeroSection = () => {
         <div className="absolute inset-0 w-full h-full">
           <img
             src={heroData.background_image}
-            alt="Hero background"
+            alt=""
             className="w-full h-full object-cover"
           />
         </div>
@@ -156,7 +165,30 @@ const HeroSection = () => {
                   ref={subtitleRef}
                   className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto lg:mx-0 text-shadow"
                 >
-                  {heroData?.description || "Developer | Analyst | IT Support Specialist. Leveraging AI tools to enhance development workflows, security analysis, and system optimization. Creating efficient, intelligent solutions."}
+                  {(() => {
+                    // If we have database content
+                    if (heroData?.description) {
+                      console.log('Hero data:', heroData); // Debug log
+                      
+                      // Split by line breaks and render each line
+                      const lines = heroData.description.split('\n');
+                      return lines.map((line, index) => (
+                        <span key={index}>
+                          {line}
+                          {index < lines.length - 1 && <br />}
+                        </span>
+                      ));
+                    }
+                    
+                    // Fallback default content
+                    return (
+                      <>
+                        Developer | Analyst | IT Support Specialist.
+                        <br />
+                        Leveraging AI tools to enhance development workflows, security analysis, and system optimization. Creating efficient, intelligent solutions.
+                      </>
+                    );
+                  })()}
                 </p>
 
                 <div ref={ctaRef} className="flex justify-center lg:justify-start">
